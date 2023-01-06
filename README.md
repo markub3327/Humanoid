@@ -2,4 +2,4 @@
 
 An open-source project with NVIDIA Jetson and Arduino.
 
-![robot](img/robot.png)
+![robot](https://raw.githubusercontent.com/markub3327/Humanoid/main/img/robot.jpg)
