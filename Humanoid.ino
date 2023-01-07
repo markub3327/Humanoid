@@ -1,58 +1,123 @@
-#include <Servo.h>
+#include <WiFiNINA.h>   // RGB LED
+#include <Arduino_LSM6DSOX.h>
 
-#define CLIP_VALUE 20
+#include "Drivers/Motors.hpp"
 
 #define NUM_OF_LEGS  6
-#define NUM_OF_ARMS  2
+#define NUM_OF_ARMS  0
+#define TOTAL_MOTORS (NUM_OF_LEGS + NUM_OF_ARMS)
 
-Servo legs[NUM_OF_LEGS];
-Servo arms[NUM_OF_ARMS];
+char state_command = 'S';
+char motor_command = 'M';
 
-int pos[NUM_OF_LEGS+NUM_OF_ARMS];
+// Drivers
+Drivers::Motors motors[TOTAL_MOTORS];
 
-int normalize_angle(int angle)
-{
-  if (angle > 180)    return 180;
-  else if (angle < 0) return 0;
-  else                return angle;
-}
-
-void get_action(Servo *s, int *actual, int size, int clip_val)
-{
-  for (int i = 0; i < size; i++)
-  {
-    auto deg = random(actual[i] - clip_val, actual[i] + clip_val);
-    deg = normalize_angle(deg);
-
-    s[i].write( deg );
-
-    // store new position
-    actual[i] = deg;
-  }
-}
 
 void setup() {
-  randomSeed(analogRead(0));
+  // init LED
+  pinMode(LEDR, OUTPUT);
+	pinMode(LEDG, OUTPUT);
+	pinMode(LEDB, OUTPUT);
 
-  delay(15000);
-
-  for (int i = 0; i < NUM_OF_LEGS; i++)
-  {
-    legs[i].attach(2 + i);
-    legs[i].write(90);
-    pos[i] = 90;
+  // start serial port
+  Serial.begin(9600);
+  while (!Serial) {
+    ;  // wait for serial port to connect. Needed for native USB port only
   }
 
-  for (int i = NUM_OF_LEGS; i < 8; i++)
-  {
-    arms[i - NUM_OF_LEGS].attach(2 + i);
-    arms[i - NUM_OF_LEGS].write(90);
-    pos[i] = 90;
+  // init IMU
+  if (!IMU.begin()) {
+	    Serial.println("Failed to initialize IMU!");
+      while (1);
+  } else {
+      Serial.print("Accelerometer sample rate = ");
+  	  Serial.print(IMU.accelerationSampleRate());
+  	  Serial.println("Hz");
+	
+  	  Serial.print("Gyroscope sample rate = ");  
+  	  Serial.print(IMU.gyroscopeSampleRate());
+  	  Serial.println("Hz");
+
+      Serial.println(sizeof(float));
   }
+
+  // Map motors to pins
+  motors[0].begin(2);
+  motors[1].begin(3);
+  motors[2].begin(4);
+  motors[3].begin(5);
+  motors[4].begin(6);
+  motors[5].begin(7);
 }
 
 void loop() {
-  get_action(legs, pos, NUM_OF_LEGS, CLIP_VALUE);
-  get_action(arms, &pos[NUM_OF_LEGS], NUM_OF_ARMS, CLIP_VALUE);
-  delay( 500 );
+
+  if (Serial.available()) {
+    char receivedData = Serial.read();
+
+    if (receivedData == state_command)
+    {
+        // joint angle
+        for (uint8_t i = 0; i < TOTAL_MOTORS; i++)
+        {
+          Serial.print(motors[i].read());
+          Serial.print(';');
+        }
+
+        // IMU
+        if (IMU.accelerationAvailable()) {
+          float Ax, Ay, Az;
+          IMU.readAcceleration(Ax, Ay, Az);
+          Serial.print(Ax, 6);
+          Serial.print(';');
+          Serial.print(Ay, 6);
+          Serial.print(';');
+          Serial.print(Az, 6);
+          Serial.print(';');
+        }
+        if (IMU.gyroscopeAvailable()) {
+          float Gx, Gy, Gz;
+      	  IMU.readGyroscope(Gx, Gy, Gz);
+          Serial.print(Gx, 6);
+          Serial.print(';');
+          Serial.print(Gy, 6);
+          Serial.print(';');
+          Serial.print(Gz, 6);
+          Serial.print(';');
+        }
+
+        // Temperature
+        if (IMU.temperatureAvailable()) {
+          float temp;
+          IMU.readTemperatureFloat(temp);
+          Serial.print(temp, 6);
+          //Serial.print(';');
+        }
+
+        digitalWrite(LEDR, HIGH);
+        digitalWrite(LEDG, HIGH);
+        digitalWrite(LEDB, LOW);
+
+        Serial.print('\n');
+    }
+    else if (receivedData == motor_command)
+    {
+        int ptr = 0;
+        while (Serial.available() > 0 && ptr < TOTAL_MOTORS) {
+            auto value = Serial.parseFloat();
+
+            // splitted by semicolon
+            if (Serial.read() == ';') {
+                motors[ptr++].write(value);
+            }
+        }
+    
+        digitalWrite(LEDR, HIGH);
+        digitalWrite(LEDG, LOW);
+        digitalWrite(LEDB, HIGH);
+
+        delay(200);   // servo stabilization delay
+    }
+  }
 }
