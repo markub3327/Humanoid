@@ -1,4 +1,5 @@
 #include <WiFiNINA.h>   // RGB LED
+#include "pico/multicore.h"
 
 #include "Drivers/Motors.hpp"
 #include "Drivers/IMU.hpp"
@@ -15,6 +16,8 @@ char motor_command = 'M';
 Drivers::Motors motors[TOTAL_MOTORS];
 Drivers::mIMU imu;
 
+//void core1_entry() {
+//}
 
 void setup() {
   // init LED
@@ -24,6 +27,8 @@ void setup() {
   digitalWrite(LEDB, LOW);
   digitalWrite(LEDG, LOW);
   digitalWrite(LEDR, LOW);
+
+  //multicore_launch_core1(core1_entry);
 
   // start serial port
   Serial.begin(115200);
@@ -48,6 +53,8 @@ void setup() {
 }
 
 void loop() {
+  // IMU
+  imu.read();
 
   if (Serial.available()) {
     char receivedData = Serial.read();
@@ -60,9 +67,6 @@ void loop() {
           Serial.print(motors[i].read(), 6);
           Serial.print(';');
         }
-
-        // IMU
-        imu.read();
 
         auto a = imu.getAccelerometer();
         Serial.print(a.x, 6);
@@ -121,7 +125,7 @@ void loop() {
         //  return;
         //}
         //timestamp = millis();
-        delay(SERVO_SPEED_TO_TIME(maxAngle));   // servo stabilization delay
+        //delay(SERVO_SPEED_TO_TIME(maxAngle));   // servo stabilization
     }
   }
 }
