@@ -22,7 +22,7 @@ jobs:
             - name: arduino:mbed_nano
           libraries: |
             # Install the libraries 
-            - name: Adafruit_AHRS
+            - name: Adafruit AHRS
             - name: WiFiNINA
             - name: Servo
             - name: Arduino_LSM6DSOX
