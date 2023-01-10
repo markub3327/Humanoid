@@ -27,9 +27,8 @@ void setup() {
 
   // start serial port
   Serial.begin(115200);
-  while (!Serial) {
-    ;  // wait for serial port to connect. Needed for native USB port only
-  }
+  while (!Serial)
+    delay(10); // will pause Zero, Leonardo, etc until serial console opens
 
   // init IMU
   imu.begin();
@@ -41,6 +40,11 @@ void setup() {
   motors[3].begin(5);
   motors[4].begin(6);
   motors[5].begin(7);
+
+  // I'm ready
+  digitalWrite(LEDB, LOW);
+  digitalWrite(LEDG, HIGH);
+  digitalWrite(LEDR, LOW);
 }
 
 void loop() {
@@ -59,27 +63,33 @@ void loop() {
 
         // IMU
         imu.read();
-        Serial.print(imu.Ax, 6);
+
+        auto a = imu.getAccelerometer();
+        Serial.print(a.x, 6);
         Serial.print(';');
-        Serial.print(imu.Ay, 6);
+        Serial.print(a.y, 6);
         Serial.print(';');
-        Serial.print(imu.Az, 6);
+        Serial.print(a.z, 6);
         Serial.print(';');
-        Serial.print(imu.Gx, 6);
+
+        auto g = imu.getGyroscope();
+        Serial.print(g.x, 6);
         Serial.print(';');
-        Serial.print(imu.Gy, 6);
+        Serial.print(g.y, 6);
         Serial.print(';');
-        Serial.print(imu.Gz, 6);
+        Serial.print(g.z, 6);
         Serial.print(';');
-        Serial.print(imu.pitch, 6);
+
+        auto v = imu.getEuler();
+        Serial.print(v.x, 6);
         Serial.print(';');
-        Serial.print(imu.roll, 6);
+        Serial.print(v.y, 6);
         Serial.print(';');
-        Serial.print(imu.yaw, 6);
+        Serial.print(v.z, 6);
         Serial.print(';');
 
         // Temperature
-        Serial.print(imu.temp, 6);
+        Serial.print(imu.getTemp(), 6);
         Serial.print('\n');
 
         digitalWrite(LEDR, HIGH);
@@ -107,6 +117,10 @@ void loop() {
         digitalWrite(LEDG, LOW);
         digitalWrite(LEDB, HIGH);
 
+        //if ((millis() - timestamp) < (1000 / FILTER_UPDATE_RATE_HZ)) {
+        //  return;
+        //}
+        //timestamp = millis();
         delay(SERVO_SPEED_TO_TIME(maxAngle));   // servo stabilization delay
     }
   }
