@@ -58,6 +58,7 @@ jobs:
           platforms: ${{ matrix.board.platforms }}
           libraries: |
             # Install the libraries 
+            - name: WiFiNINA
             - name: Servo
             - name: Arduino_LSM6DSOX
             - name: SensorFusion
