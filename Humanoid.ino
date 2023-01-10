@@ -1,17 +1,19 @@
 #include <WiFiNINA.h>   // RGB LED
-#include <Arduino_LSM6DSOX.h>
 
 #include "Drivers/Motors.hpp"
+#include "Drivers/IMU.hpp"
 
 #define NUM_OF_LEGS  6
 #define NUM_OF_ARMS  0
 #define TOTAL_MOTORS (NUM_OF_LEGS + NUM_OF_ARMS)
 
+#define SERVO_SPEED_TO_TIME(angle)  (170 * angle / 60.0f)
 char state_command = 'S';
 char motor_command = 'M';
 
 // Drivers
 Drivers::Motors motors[TOTAL_MOTORS];
+Drivers::mIMU imu;
 
 
 void setup() {
@@ -19,28 +21,18 @@ void setup() {
   pinMode(LEDR, OUTPUT);
 	pinMode(LEDG, OUTPUT);
 	pinMode(LEDB, OUTPUT);
+  digitalWrite(LEDB, LOW);
+  digitalWrite(LEDG, LOW);
+  digitalWrite(LEDR, LOW);
 
   // start serial port
-  Serial.begin(9600);
+  Serial.begin(115200);
   while (!Serial) {
     ;  // wait for serial port to connect. Needed for native USB port only
   }
 
   // init IMU
-  if (!IMU.begin()) {
-	    Serial.println("Failed to initialize IMU!");
-      while (1);
-  } else {
-      Serial.print("Accelerometer sample rate = ");
-  	  Serial.print(IMU.accelerationSampleRate());
-  	  Serial.println("Hz");
-	
-  	  Serial.print("Gyroscope sample rate = ");  
-  	  Serial.print(IMU.gyroscopeSampleRate());
-  	  Serial.println("Hz");
-
-      Serial.println(sizeof(float));
-  }
+  imu.begin();
 
   // Map motors to pins
   motors[0].begin(2);
@@ -61,63 +53,61 @@ void loop() {
         // joint angle
         for (uint8_t i = 0; i < TOTAL_MOTORS; i++)
         {
-          Serial.print(motors[i].read());
+          Serial.print(motors[i].read(), 6);
           Serial.print(';');
         }
 
         // IMU
-        if (IMU.accelerationAvailable()) {
-          float Ax, Ay, Az;
-          IMU.readAcceleration(Ax, Ay, Az);
-          Serial.print(Ax, 6);
-          Serial.print(';');
-          Serial.print(Ay, 6);
-          Serial.print(';');
-          Serial.print(Az, 6);
-          Serial.print(';');
-        }
-        if (IMU.gyroscopeAvailable()) {
-          float Gx, Gy, Gz;
-      	  IMU.readGyroscope(Gx, Gy, Gz);
-          Serial.print(Gx, 6);
-          Serial.print(';');
-          Serial.print(Gy, 6);
-          Serial.print(';');
-          Serial.print(Gz, 6);
-          Serial.print(';');
-        }
+        imu.read();
+        Serial.print(imu.Ax, 6);
+        Serial.print(';');
+        Serial.print(imu.Ay, 6);
+        Serial.print(';');
+        Serial.print(imu.Az, 6);
+        Serial.print(';');
+        Serial.print(imu.Gx, 6);
+        Serial.print(';');
+        Serial.print(imu.Gy, 6);
+        Serial.print(';');
+        Serial.print(imu.Gz, 6);
+        Serial.print(';');
+        Serial.print(imu.pitch, 6);
+        Serial.print(';');
+        Serial.print(imu.roll, 6);
+        Serial.print(';');
+        Serial.print(imu.yaw, 6);
+        Serial.print(';');
 
         // Temperature
-        if (IMU.temperatureAvailable()) {
-          float temp;
-          IMU.readTemperatureFloat(temp);
-          Serial.print(temp, 6);
-          //Serial.print(';');
-        }
+        Serial.print(imu.temp, 6);
+        Serial.print('\n');
 
         digitalWrite(LEDR, HIGH);
         digitalWrite(LEDG, HIGH);
         digitalWrite(LEDB, LOW);
-
-        Serial.print('\n');
     }
     else if (receivedData == motor_command)
     {
         int ptr = 0;
+        float deltaAngle = 0.0, maxAngle = 0.0;
         while (Serial.available() > 0 && ptr < TOTAL_MOTORS) {
             auto value = Serial.parseFloat();
 
             // splitted by semicolon
             if (Serial.read() == ';') {
+                // find maximal delta
+                deltaAngle = abs(motors[ptr].read() - value);
+                if (deltaAngle > maxAngle) 
+                    maxAngle = deltaAngle;
                 motors[ptr++].write(value);
             }
         }
-    
+
         digitalWrite(LEDR, HIGH);
         digitalWrite(LEDG, LOW);
         digitalWrite(LEDB, HIGH);
 
-        delay(200);   // servo stabilization delay
+        delay(SERVO_SPEED_TO_TIME(maxAngle));   // servo stabilization delay
     }
   }
 }
